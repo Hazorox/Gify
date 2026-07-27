@@ -1,6 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use tauri::{
-    Manager, 
+    Manager,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
@@ -23,11 +23,15 @@ pub fn run() {
                     if shortcut == &handler {
                         match event.state() {
                             ShortcutState::Pressed => {
-                                println!("Pressed!");
                                 if let Some(win) = Manager::get_webview_window(app, "main") {
-                                    let _ = win.show();
-                                    let _ = win.set_focus();
-                                    let _ = win.set_visible_on_all_workspaces(true);
+                                    if win.is_visible().unwrap() {
+                                        let _ = win.hide();
+                                        let _ = win.set_visible_on_all_workspaces(false);
+                                    } else {
+                                        let _ = win.show();
+                                        let _ = win.set_focus();
+                                        let _ = win.set_visible_on_all_workspaces(true);
+                                    }
                                 }
                             }
                             _ => {}
