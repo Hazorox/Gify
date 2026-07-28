@@ -36,16 +36,6 @@ pub fn run() {
                             }
                             _ => {}
                         }
-                    } else if shortcut == &exit_key {
-                        match event.state() {
-                            ShortcutState::Pressed => {
-                                if let Some(win) = tauri::Manager::get_webview_window(app, "main") {
-                                    let _ = win.hide();
-                                    let _ = win.set_visible_on_all_workspaces(false);
-                                }
-                            }
-                            _ => {}
-                        }
                     }
                 })
                 .build(),
