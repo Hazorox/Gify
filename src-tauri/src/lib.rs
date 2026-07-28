@@ -1,22 +1,28 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
 use tauri::{
-    Manager,
+    Manager, WindowEvent,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    WindowEvent
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+struct DragState(Arc<AtomicBool>);
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+fn set_dragging(drag: bool, state: tauri::State<DragState>) {
+    state.0.store(drag, SeqCst);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let drag = Arc::new(AtomicBool::new(false));
+
     let main_key = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyG);
     let handler = main_key.clone();
-    let exit_key = Shortcut::new(None, Code::Escape);
     tauri::Builder::default()
+        .manage(DragState(drag.clone()))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 // Listen for the shortcut
@@ -42,22 +48,24 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![set_dragging])
         .setup(move |app: &mut tauri::App| {
             // register the shortcut
             app.global_shortcut().register(main_key)?;
-            app.global_shortcut().register(exit_key)?;
-
 
             // Listening for when focus lost, to hide app
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
-            window.on_window_event(move |event|{
-                if let WindowEvent::Focused(focused) = event{
-                    if !focused {
-                        window_clone.hide();
-                        window_clone.set_visible_on_all_workspaces(false);
-                    }
+            window.on_window_event(move |event| {
+                if let WindowEvent::Focused(_focused) = event {
+                    let win = window_clone.clone();
+                    std::thread::spawn(move || {
+                        // Sleep for 100 milliseconds then close if not focused ( Got some help in this from Claude )
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        if let Ok(false) = win.is_focused() {
+                            let _ = win.hide();
+                        }
+                    });
                 }
             });
 
