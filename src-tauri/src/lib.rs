@@ -3,6 +3,7 @@ use tauri::{
     Manager,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
+    WindowEvent
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 #[tauri::command]
@@ -46,6 +47,19 @@ pub fn run() {
             // register the shortcut
             app.global_shortcut().register(main_key)?;
             app.global_shortcut().register(exit_key)?;
+
+
+            // Listening for when focus lost, to hide app
+            let window = app.get_webview_window("main").unwrap();
+            let window_clone = window.clone();
+            window.on_window_event(move |event|{
+                if let WindowEvent::Focused(focused) = event{
+                    if !focused {
+                        window_clone.hide();
+                        window_clone.set_visible_on_all_workspaces(false);
+                    }
+                }
+            });
 
             // Registering tray buttons and setup
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
