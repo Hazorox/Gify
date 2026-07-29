@@ -22,6 +22,7 @@ pub fn run() {
     let main_key = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyG);
     let handler = main_key.clone();
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .manage(DragState(drag.clone()))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
