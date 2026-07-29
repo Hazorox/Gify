@@ -13,7 +13,7 @@
     "windows": [
       {
         "skipTaskbar":true,
-        "width": 300,
+        "width": 400,
         "height": 500,
         "decorations":false,
         "alwaysOnTop":true,
