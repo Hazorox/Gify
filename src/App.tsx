@@ -15,10 +15,6 @@ function App() {
   const [apiKey, setApiKey] = useState("");
   const [autostart,setAutostart] = useState<boolean>(false)
   const [searchInput, setSearchInput] = useState<string>("");
-  const [provider, setProvider] = useState<"Giphy" | "Klippy">(
-    "Giphy",
-  );
-
    useEffect(() => {
     const handleMouseUp = () => {
       invoke("set_drag", { dragging: false });
@@ -58,21 +54,6 @@ function App() {
           className="absolute top-1 right-1 hidden h-fit w-[60%] bg-[#171717]/70 border-2 border-gray-900 rounded-xl flex flex-col "
           ref={optionsRef}
         >
-          <div className="border-b-2 py-2 border-gray-300 w-full flex justify-around">
-            Provider
-            <select
-              className="text-black bg-gray-400 rounded-xl"
-              defaultValue={"Giphy"}
-              onChange={(e) => {
-                if (!["Giphy", "Klippy"].includes(e.target.value))
-                  return;
-                setProvider(e.target.value as "Giphy" | "Klippy");
-              }}
-            >
-              <option value="Giphy">Giphy</option>
-              <option value="Klippy">Klippy</option>
-            </select>
-          </div>
           <div className="border-b-2 py-2 border-gray-300 w-full flex justify-around">
             API Key{" "}
             <input
