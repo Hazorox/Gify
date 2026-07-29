@@ -15,7 +15,7 @@ function App() {
   const [apiKey, setApiKey] = useState("");
   const [autostart,setAutostart] = useState<boolean>(false)
   const [searchInput, setSearchInput] = useState<string>("");
-  const [provider, setProvider] = useState<"Giphy" | "Tenor" | "Klippy">(
+  const [provider, setProvider] = useState<"Giphy" | "Klippy">(
     "Giphy",
   );
 
@@ -64,13 +64,12 @@ function App() {
               className="text-black bg-gray-400 rounded-xl"
               defaultValue={"Giphy"}
               onChange={(e) => {
-                if (!["Giphy", "Tenor", "Klippy"].includes(e.target.value))
+                if (!["Giphy", "Klippy"].includes(e.target.value))
                   return;
-                setProvider(e.target.value as "Giphy" | "Klippy" | "Tenor");
+                setProvider(e.target.value as "Giphy" | "Klippy");
               }}
             >
               <option value="Giphy">Giphy</option>
-              <option value="Tenor">Tenor</option>
               <option value="Klippy">Klippy</option>
             </select>
           </div>
