@@ -1,23 +1,28 @@
 import { IoIosSettings } from "react-icons/io";
 import "./App.css";
 import { useEffect, useRef, useState } from "react";
-import Switch from "react-switch"
+import Switch from "react-switch";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { Grid } from "@giphy/react-components";
+import { GiphyFetch } from "@giphy/js-fetch-api";
+import useDebounce from "./hooks/useDebounce";
 
-const handleDragMouse = (_:React.MouseEvent)=>{
-  invoke("set_dragging",{drag:true})
-  getCurrentWindow().startDragging()
-}
+const handleDragMouse = (_: React.MouseEvent) => {
+  invoke("set_dragging", { drag: true });
+  getCurrentWindow().startDragging();
+};
 
 function App() {
-  const [contents, setContents] = useState([]);
-  const [apiKey, setApiKey] = useState("");
-  const [autostart,setAutostart] = useState<boolean>(false)
+  const [apiKey, setApiKey] = useState(import.meta.env.VITE_API_KEY ?? "");
+  const [autostart, setAutostart] = useState<boolean>(false);
   const [searchInput, setSearchInput] = useState<string>("");
-   useEffect(() => {
+  const debouncedSearch = useDebounce(searchInput, 200);
+  const gf = new GiphyFetch(apiKey);
+
+  useEffect(() => {
     const handleMouseUp = () => {
-      invoke("set_drag", { dragging: false });
+      invoke("set_dragging", { drag: false });
     };
     window.addEventListener("mouseup", handleMouseUp);
     return () => {
@@ -25,7 +30,15 @@ function App() {
     };
   }, []);
   const optionsRef = useRef<HTMLDivElement>(null);
-  return (
+  const fetchGifs = (offset: number) =>
+    gf
+      .search(debouncedSearch, {
+        lang: "en",
+        offset,
+        limit: 10,
+        sort: "relevant",
+      })
+      return (
     <div className="w-full h-full overflow-hidden bg-[#282828] text-white">
       <div
         data-tauri-drag-region
@@ -35,6 +48,9 @@ function App() {
         GIFy
         <input
           type="text"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
           placeholder="Search"
           className="w-[60%] placeholder:text-center focus:border-2 focus:border-gray-400 border-gray-500 select-text flex justify-center self-center text-center items-center rounded-lg sticky border-2"
           onChange={(e) => {
@@ -44,6 +60,9 @@ function App() {
         />
         <IoIosSettings
           className="cursor-pointer"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
           onClick={() => {
             optionsRef?.current?.classList.toggle("hidden");
           }}
@@ -67,14 +86,25 @@ function App() {
           </div>
           <div className="border-b-2 py-2 border-gray-300 w-full flex justify-around">
             Auto Start
-            <Switch onChange={()=>{setAutostart(prev=>!prev)}} checked={autostart}/>
+            <Switch
+              onChange={() => {
+                setAutostart((prev) => !prev);
+              }}
+              checked={autostart}
+            />
           </div>
           <div className="py-2 border-gray-300 w-full flex justify-around">
             Hotkey
-            <button className="w-1/2 bg-gray-400 text-gray-800 border cursor-pointer rounded-full">record</button>
+            <button className="w-1/2 bg-gray-400 text-gray-800 border cursor-pointer rounded-full">
+              record
+            </button>
           </div>
         </div>
+        <div className="w-full h-full flex justify-center overflow-y-auto">
+          <Grid key={debouncedSearch} width={window.innerWidth-16} columns={2} fetchGifs={fetchGifs} />
+        </div>
       </div>
+      test
     </div>
   );
 }
