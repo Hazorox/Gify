@@ -7,6 +7,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { Grid } from "@giphy/react-components";
 import { GiphyFetch } from "@giphy/js-fetch-api";
 import useDebounce from "./hooks/useDebounce";
+import { load } from "@tauri-apps/plugin-store";
+import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 
 const handleDragMouse = (_: React.MouseEvent) => {
   invoke("set_dragging", { drag: true });
@@ -14,8 +16,11 @@ const handleDragMouse = (_: React.MouseEvent) => {
 };
 
 function App() {
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_API_KEY ?? "");
-  const [autostart, setAutostart] = useState<boolean>(false);
+  const [store, setStore] = useState<Awaited<ReturnType<typeof load>> | null>(
+    null,
+  );
+  const [apiKey, setApiKey] = useState("");
+  const [autostart, setAutostart] = useState(false);
   const [searchInput, setSearchInput] = useState<string>("");
   const debouncedSearch = useDebounce(searchInput, 200);
   const gf = new GiphyFetch(apiKey);
@@ -31,14 +36,24 @@ function App() {
   }, []);
   const optionsRef = useRef<HTMLDivElement>(null);
   const fetchGifs = (offset: number) =>
-    gf
-      .search(debouncedSearch, {
-        lang: "en",
-        offset,
-        limit: 10,
-        sort: "relevant",
-      })
-      return (
+    gf.search(debouncedSearch, {
+      lang: "en",
+      offset,
+      limit: 10,
+      sort: "relevant",
+    });
+
+  useEffect(() => {
+    const fetchStuff = async () => {
+      const contents = await load("store.json", { autoSave: true });
+      setStore(contents);
+      setApiKey((await contents.get("apiKey")) ?? "");
+      setAutostart(await isEnabled());
+    };
+    fetchStuff();
+  }, []);
+  console.log(autostart);
+  return (
     <div className="w-full h-full overflow-hidden bg-[#282828] text-white">
       <div
         data-tauri-drag-region
@@ -70,14 +85,15 @@ function App() {
       </div>
       <div className="relative h-full">
         <div
-          className="absolute top-1 right-1 hidden h-fit w-[60%] bg-[#171717]/70 border-2 border-gray-900 rounded-xl flex flex-col "
+          className="absolute top-1 right-1 hidden z-100 h-fit w-[60%] bg-[#171717]/70 border-2 border-gray-900 rounded-xl flex flex-col "
           ref={optionsRef}
         >
           <div className="border-b-2 py-2 border-gray-300 w-full flex justify-around">
             API Key{" "}
             <input
-              onChange={(e) => {
+              onChange={async (e) => {
                 setApiKey(e.target.value);
+                await store?.set("apiKey", e.target.value);
               }}
               placeholder="Key"
               value={apiKey}
@@ -87,8 +103,14 @@ function App() {
           <div className="border-b-2 py-2 border-gray-300 w-full flex justify-around">
             Auto Start
             <Switch
-              onChange={() => {
-                setAutostart((prev) => !prev);
+              onChange={async () => {
+                const enabled = await isEnabled();
+                if (enabled) {
+                  await disable();
+                } else {
+                  await enable();
+                }
+                setAutostart(await isEnabled())
               }}
               checked={autostart}
             />
@@ -101,7 +123,12 @@ function App() {
           </div>
         </div>
         <div className="w-full h-full flex justify-center overflow-y-auto">
-          <Grid key={debouncedSearch} width={window.innerWidth-16} columns={2} fetchGifs={fetchGifs} />
+          <Grid
+            key={debouncedSearch}
+            width={window.innerWidth - 16}
+            columns={2}
+            fetchGifs={fetchGifs}
+          />
         </div>
       </div>
       test
