@@ -9,7 +9,15 @@ import { GiphyFetch } from "@giphy/js-fetch-api";
 import useDebounce from "./hooks/useDebounce";
 import { load } from "@tauri-apps/plugin-store";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
+import { useRecordHotkeys } from "react-hotkeys-hook";
 
+
+// Modifiers and validation
+const modifiers = new Set(["Ctrl", "Control", "Alt", "Shift", "Meta", "Super"]);
+const validateMod = (key: string, normal = false) => {
+  if (normal) return !modifiers.has(key);
+  return modifiers.has(key);
+};
 const handleDragMouse = (_: React.MouseEvent) => {
   invoke("set_dragging", { drag: true });
   getCurrentWindow().startDragging();
@@ -22,6 +30,9 @@ function App() {
   const [apiKey, setApiKey] = useState("");
   const [autostart, setAutostart] = useState(false);
   const [searchInput, setSearchInput] = useState<string>("");
+  const [hotkey, setHotkey] = useState<string>("");
+  const [error, setError] = useState(false);
+  const [keys, { start, stop, isRecording }] = useRecordHotkeys();
   const debouncedSearch = useDebounce(searchInput, 200);
   const gf = new GiphyFetch(apiKey);
 
@@ -52,7 +63,6 @@ function App() {
     };
     fetchStuff();
   }, []);
-  console.log(autostart);
   return (
     <div className="w-full h-full overflow-hidden bg-[#282828] text-white">
       <div
@@ -110,16 +120,56 @@ function App() {
                 } else {
                   await enable();
                 }
-                setAutostart(await isEnabled())
+                setAutostart(await isEnabled());
               }}
               checked={autostart}
             />
           </div>
-          <div className="py-2 border-gray-300 w-full flex justify-around">
+          <div className="py-2 border-gray-300 flex-col gap-2 justify-center items-center w-full flex">
             Hotkey
-            <button className="w-1/2 bg-gray-400 text-gray-800 border cursor-pointer rounded-full">
-              record
-            </button>
+            <span className="flex w-[90%]">
+              <button
+                onClick={() => {
+                  if (isRecording) {
+                    const keyz = Array.from(keys);
+                    const mods = keyz
+                      .map(
+                        (key: string) =>
+                          key[0].toLocaleUpperCase() + key.slice(1),
+                      )
+                      .filter((key) => validateMod(key));
+                    let normal = keyz
+                      .map(
+                        (key: string) =>
+                          key[0].toLocaleUpperCase() + key.slice(1),
+                      )
+                      .filter((key) => validateMod(key, true));
+                    if (normal.length != 1 && mods.length != 2) {
+                      setError(true);
+                      return;
+                    }else{
+                      setError(false)
+                    }
+                    normal[0] = "Key" + normal[0].toLocaleUpperCase();
+                    setHotkey([mods[0], mods[1], normal[0]].join("+"));
+                    stop();
+                  } else {
+                    start();
+                  }
+                }}
+                className="w-1/2 bg-gray-400 text-gray-800  cursor-pointer rounded-l-full border-r-2"
+              >
+                {isRecording ? "Press to stop" : "Record"}
+              </button>
+              <span className="bg-gray-400 text-sm w-1/2 flex justify-center items-center text-gray-800 rounded-r-full">
+                {hotkey}
+              </span>
+            </span>
+              {error && (
+                <span className="text-red-500 text-center">
+                  Invalid shortcut format.. 2 Modifiers and 1 Key
+                </span>
+              )}
           </div>
         </div>
         <div className="w-full h-full flex justify-center overflow-y-auto">
