@@ -10,7 +10,7 @@ import useDebounce from "./hooks/useDebounce";
 import { load } from "@tauri-apps/plugin-store";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { useRecordHotkeys } from "react-hotkeys-hook";
-
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 // Modifiers and validation
 const modifiers = new Set(["Ctrl", "Control", "Alt", "Shift", "Meta", "Super"]);
@@ -18,15 +18,16 @@ const validateMod = (key: string, normal = false) => {
   if (normal) return !modifiers.has(key);
   return modifiers.has(key);
 };
-const handleDragMouse = (_: React.MouseEvent) => {
-  invoke("set_dragging", { drag: true });
-  getCurrentWindow().startDragging();
+const handleDragMouse = (_: React.MouseEvent, bool: boolean) => {
+  invoke("set_dragging", { drag: bool });
+  if (bool) getCurrentWindow().startDragging();
 };
 
 function App() {
   const [store, setStore] = useState<Awaited<ReturnType<typeof load>> | null>(
     null,
   );
+  // const [active, setActive] = useState;
   const [apiKey, setApiKey] = useState("");
   const [autostart, setAutostart] = useState(false);
   const [searchInput, setSearchInput] = useState<string>("");
@@ -58,16 +59,29 @@ function App() {
     const fetchStuff = async () => {
       const contents = await load("store.json", { autoSave: true });
       setStore(contents);
-      setApiKey((await contents.get("apiKey")) ?? "Alt+Shift+KeyG");
+      setHotkey((await contents.get("key")) ?? "Alt+Shift+KeyG");
+      setApiKey((await contents.get("apiKey")) ?? "");
       setAutostart(await isEnabled());
     };
     fetchStuff();
+  }, []);
+
+  // Disable Right Click Default
+  useEffect(() => {
+    const disableRightClick = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("contextmenu", disableRightClick);
+    return () => document.removeEventListener("contextmenu", disableRightClick);
   }, []);
   return (
     <div className="w-full h-full overflow-hidden bg-[#282828] text-white">
       <div
         data-tauri-drag-region
-        onMouseDown={handleDragMouse}
+        onMouseDown={(e) => {
+          handleDragMouse(e, true);
+        }}
+        onMouseUp={(e) => {
+          handleDragMouse(e, false);
+        }}
         className="w-full select-none border-b-2 h-[8%]  gap-2 text-xl flex sticky justify-between px-2 py-1 items-center border-[#717171]"
       >
         GIFy
@@ -144,19 +158,18 @@ function App() {
                           key[0].toLocaleUpperCase() + key.slice(1),
                       )
                       .filter((key) => validateMod(key, true));
-                    if (normal.length != 1 && mods.length != 2) {
+                    if (normal.length != 1 || mods.length != 2) {
                       setError(true);
-                      stop()
+                      stop();
                       return;
-                    }else{
-                      setError(false)
+                    } else {
+                      setError(false);
                     }
                     normal[0] = "Key" + normal[0].toLocaleUpperCase();
-                    const result = [mods[0], mods[1], normal[0]].join("+")
+                    const result = [mods[0], mods[1], normal[0]].join("+");
                     setHotkey(result);
-                    invoke("update_hotkey",{key:result})
+                    invoke("update_hotkey", { key: result });
                     stop();
-
                   } else {
                     start();
                   }
@@ -169,15 +182,21 @@ function App() {
                 {hotkey}
               </span>
             </span>
-              {error && (
-                <span className="text-red-500 text-center">
-                  Invalid shortcut format.. 2 Modifiers and 1 Key
-                </span>
-              )}
+            {error && (
+              <span className="text-red-500 text-center">
+                Invalid shortcut format.. 2 Modifiers and 1 Key
+              </span>
+            )}
           </div>
         </div>
         <div className="w-full h-full flex justify-center overflow-y-auto">
           <Grid
+            noLink={true}
+            onGifClick={async (gif, e) => {
+              console.log("PRESSED")
+              e.preventDefault();
+             await writeText(gif.url)
+            }}
             key={debouncedSearch}
             width={window.innerWidth - 16}
             columns={2}
@@ -185,7 +204,6 @@ function App() {
           />
         </div>
       </div>
-      test
     </div>
   );
 }
