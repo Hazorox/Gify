@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex};
 use tauri::{
-    Manager, WindowEvent,
+    Emitter, Manager, WindowEvent,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
@@ -16,7 +16,6 @@ struct DragState(Arc<AtomicBool>);
 fn set_dragging(drag: bool, state: tauri::State<DragState>) {
     state.0.store(drag, SeqCst);
 }
-
 
 
 // Update Hotkey Command ( With some Claude Help.. Im a rotten rusty :< )
@@ -48,24 +47,13 @@ fn update_hotkey(
     Ok(())
 }
 
-// Managing ApiKey
-struct ApiState(Mutex<String>);
-#[tauri::command]
-fn update_api(app: tauri::AppHandle,key:String,api_state:tauri::State<ApiState>) -> Result<(),String> {
-    
-    *api_state.0.lock().unwrap()=key.clone();
-    let store = app.store("store.json").unwrap();
-    let _ = store.set("apiKey",key.clone());
-    let _ = store.save().map_err(|e| format!("Error Saving ApiKey {:?}",e));
-    Ok(())
-}
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let drag = Arc::new(AtomicBool::new(false));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(DragState(drag.clone()))
@@ -73,7 +61,6 @@ pub fn run() {
             Some(Modifiers::ALT | Modifiers::SHIFT),
             Code::KeyG,
         ))))
-        .manage(ApiState(Mutex::new(String::new())))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 // Listen for the shortcut
@@ -87,6 +74,7 @@ pub fn run() {
                                 let _ = win.show();
                                 let _ = win.set_focus();
                                 let _ = win.set_visible_on_all_workspaces(true);
+                                let _ = win.emit("window-shown", ());
                             }
                         }
                     }
@@ -95,7 +83,11 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![set_dragging, update_hotkey,update_api])
+        .invoke_handler(tauri::generate_handler![
+            set_dragging,
+            update_hotkey
+            
+        ])
         .setup(move |app: &mut tauri::App| {
             // Load config file
             let store = app.store("store.json").unwrap();
