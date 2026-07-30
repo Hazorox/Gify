@@ -58,7 +58,7 @@ function App() {
     const fetchStuff = async () => {
       const contents = await load("store.json", { autoSave: true });
       setStore(contents);
-      setApiKey((await contents.get("apiKey")) ?? "");
+      setApiKey((await contents.get("apiKey")) ?? "Alt+Shift+KeyG");
       setAutostart(await isEnabled());
     };
     fetchStuff();
@@ -129,7 +129,7 @@ function App() {
             Hotkey
             <span className="flex w-[90%]">
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (isRecording) {
                     const keyz = Array.from(keys);
                     const mods = keyz
@@ -146,13 +146,17 @@ function App() {
                       .filter((key) => validateMod(key, true));
                     if (normal.length != 1 && mods.length != 2) {
                       setError(true);
+                      stop()
                       return;
                     }else{
                       setError(false)
                     }
                     normal[0] = "Key" + normal[0].toLocaleUpperCase();
-                    setHotkey([mods[0], mods[1], normal[0]].join("+"));
+                    const result = [mods[0], mods[1], normal[0]].join("+")
+                    setHotkey(result);
+                    invoke("update_hotkey",{key:result})
                     stop();
+
                   } else {
                     start();
                   }
@@ -161,7 +165,7 @@ function App() {
               >
                 {isRecording ? "Press to stop" : "Record"}
               </button>
-              <span className="bg-gray-400 text-sm w-1/2 flex justify-center items-center text-gray-800 rounded-r-full">
+              <span className="bg-gray-400 text-xs w-1/2 flex justify-center items-center text-gray-800 rounded-r-full">
                 {hotkey}
               </span>
             </span>

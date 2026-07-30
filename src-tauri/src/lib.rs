@@ -1,56 +1,108 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::{Arc, Mutex};
 use tauri::{
     Manager, WindowEvent,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_store::StoreExt;
 
-struct DragState(Arc<AtomicBool>);
+
+// Update Hotkey Command ( With some Claude Help.. Im a rotten rusty :< )
+struct HotkeyState(Mutex<Shortcut>);
 #[tauri::command]
-fn set_dragging(drag: bool, state: tauri::State<DragState>) {
-    state.0.store(drag, SeqCst);
+fn update_hotkey(
+    app: tauri::AppHandle,
+    key: String,
+    shortcut_state: tauri::State<HotkeyState>,
+) -> Result<(), String> {
+    let new_key = key
+        .parse::<Shortcut>()
+        .map_err(|e| format!("Invalid Shortcut {:?}", e))?;
+    let mut current_key = shortcut_state.0.lock().unwrap();
+
+    let _ = app
+        .global_shortcut()
+        .unregister(*current_key)
+        .map_err(|err| format!("Error unregistering old key {:?}", err));
+    let _ = app
+        .global_shortcut()
+        .register(new_key)
+        .map_err(|err| format!("Error unregistering old key {:?}", err));
+
+    let store = app.store("store.json").unwrap();
+    store.set("key", key);
+    let _ = store.save();
+    *current_key = new_key;
+    Ok(())
 }
+
+// Managing ApiKey
+struct ApiState(Mutex<String>);
+#[tauri::command]
+fn update_api(app: tauri::AppHandle,key:String,api_state:tauri::State<ApiState>) -> Result<(),String> {
+
+}
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let drag = Arc::new(AtomicBool::new(false));
 
-    let main_key = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyG);
-    let handler = main_key.clone();
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .manage(DragState(drag.clone()))
+        .manage(HotkeyState(Mutex::new(Shortcut::new(
+            Some(Modifiers::ALT | Modifiers::SHIFT),
+            Code::KeyG,
+        ))))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 // Listen for the shortcut
-                .with_handler(move |app, shortcut, event| {
-                    if shortcut == &handler {
-                        match event.state() {
-                            ShortcutState::Pressed => {
-                                if let Some(win) = Manager::get_webview_window(app, "main") {
-                                    if win.is_visible().unwrap() {
-                                        let _ = win.hide();
-                                        let _ = win.set_visible_on_all_workspaces(false);
-                                    } else {
-                                        let _ = win.show();
-                                        let _ = win.set_focus();
-                                        let _ = win.set_visible_on_all_workspaces(true);
-                                    }
-                                }
+                .with_handler(move |app, _shortcut, event| match event.state() {
+                    ShortcutState::Pressed => {
+                        if let Some(win) = Manager::get_webview_window(app, "main") {
+                            if win.is_visible().unwrap() {
+                                let _ = win.hide();
+                                let _ = win.set_visible_on_all_workspaces(false);
+                            } else {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                                let _ = win.set_visible_on_all_workspaces(true);
                             }
-                            _ => {}
                         }
                     }
+                    _ => {}
                 })
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![set_dragging])
+        .invoke_handler(tauri::generate_handler![set_dragging, update_hotkey])
         .setup(move |app: &mut tauri::App| {
+            // Load config file
+            let store = app.store("store.json").unwrap();
+
+            // Managing Hotkey
+            let default_key = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyG);
+
+            // Got some help for fetching store_key from Claude
+            let store_key = store
+                .get("key")
+                .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+            let main_key = match store_key {
+                // Parse the string to a valid Hotkey
+                Some(key_string) => key_string.parse::<Shortcut>().unwrap_or(default_key),
+                None => default_key,
+            };
+
+            // Update hotkey state for later usage during application runtime
+            *app.state::<HotkeyState>().0.lock().unwrap() = main_key;
+
             // register the shortcut
             app.global_shortcut().register(main_key)?;
 
