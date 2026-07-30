@@ -10,6 +10,14 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
+// Managing Drag
+struct DragState(Arc<AtomicBool>);
+#[tauri::command]
+fn set_dragging(drag: bool, state: tauri::State<DragState>) {
+    state.0.store(drag, SeqCst);
+}
+
+
 
 // Update Hotkey Command ( With some Claude Help.. Im a rotten rusty :< )
 struct HotkeyState(Mutex<Shortcut>);
@@ -44,7 +52,12 @@ fn update_hotkey(
 struct ApiState(Mutex<String>);
 #[tauri::command]
 fn update_api(app: tauri::AppHandle,key:String,api_state:tauri::State<ApiState>) -> Result<(),String> {
-
+    
+    *api_state.0.lock().unwrap()=key.clone();
+    let store = app.store("store.json").unwrap();
+    let _ = store.set("apiKey",key.clone());
+    let _ = store.save().map_err(|e| format!("Error Saving ApiKey {:?}",e));
+    Ok(())
 }
 
 
@@ -60,6 +73,7 @@ pub fn run() {
             Some(Modifiers::ALT | Modifiers::SHIFT),
             Code::KeyG,
         ))))
+        .manage(ApiState(Mutex::new(String::new())))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 // Listen for the shortcut
@@ -81,7 +95,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![set_dragging, update_hotkey])
+        .invoke_handler(tauri::generate_handler![set_dragging, update_hotkey,update_api])
         .setup(move |app: &mut tauri::App| {
             // Load config file
             let store = app.store("store.json").unwrap();
