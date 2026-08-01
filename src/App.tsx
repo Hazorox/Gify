@@ -11,6 +11,7 @@ import { load } from "@tauri-apps/plugin-store";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { useRecordHotkeys } from "react-hotkeys-hook";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { listen } from "@tauri-apps/api/event";
 
 // Modifiers and validation
 const modifiers = new Set(["Ctrl", "Control", "Alt", "Shift", "Meta", "Super"]);
@@ -36,7 +37,7 @@ function App() {
   const [keys, { start, stop, isRecording }] = useRecordHotkeys();
   const debouncedSearch = useDebounce(searchInput, 200);
   const gf = new GiphyFetch(apiKey);
-
+  const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const handleMouseUp = () => {
       invoke("set_dragging", { drag: false });
@@ -65,7 +66,9 @@ function App() {
     };
     fetchStuff();
   }, []);
-
+  listen("window-shown",()=>{
+    inputRef.current?.focus()
+  })
   // Disable Right Click Default
   useEffect(() => {
     const disableRightClick = (e: MouseEvent) => e.preventDefault();
@@ -90,6 +93,7 @@ function App() {
           onMouseDown={(e) => {
             e.stopPropagation();
           }}
+          ref={inputRef}
           placeholder="Search"
           className="w-[60%] placeholder:text-center focus:border-2 focus:border-gray-400 border-gray-500 select-text flex justify-center self-center text-center items-center rounded-lg sticky border-2"
           onChange={(e) => {
