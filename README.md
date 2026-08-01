@@ -5,7 +5,7 @@ A Tauri ( React - Rust) application built for windows
 
 DEMO : 
 
-<video src="images/GIFy_DEMO.mp4" controls width="600"></video>
+<video src="images/GIFy_DEMO.mp4" controls width="600" />
 
 Lives in system tray and shows up with a user-defined hotkey ( Alt + Shift + G on initial launch )
 
